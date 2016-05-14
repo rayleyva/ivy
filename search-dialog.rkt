@@ -1,7 +1,6 @@
 #lang racket/base
 ; search-dialog.rkt
-(require racket/dict
-         racket/gui/base
+(require racket/gui/base
          racket/class
          racket/string
          racket/list
@@ -20,12 +19,10 @@
     (string->symbol
      (send type-rbox get-item-label
            (send type-rbox get-selection))))
-  ; make sure there aren't any nonexistant files in the dictionary
-  (clean-dict! master)
   (define imgs
     (if tags
-        (search-dict master search-type tags)
-        (dict-keys master)))
+        (search-redis search-type tags)
+        (redis-keys)))
   (define exclude-tags
     (if (string=? (send exclude-tfield get-value) "")
         #f
@@ -36,8 +33,8 @@
          (send search-tag-dialog show #t)]
         [else
          (if exclude-tags
-             (display-tags (exclude-search master imgs exclude-tags))
-             (display-tags search-type tags))]))
+             (display-tags (exclude-search imgs exclude-tags))
+             (display-tags imgs))]))
 
 (define search-tag-dialog
   (new dialog%

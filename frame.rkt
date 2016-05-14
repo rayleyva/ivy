@@ -3,7 +3,6 @@
 ; main frame file for ivy, the taggable image viewer
 (require pict
          "base.rkt"
-         "search-results.rkt"
          "search-dialog.rkt")
 (provide (all-defined-out))
 
@@ -202,13 +201,13 @@
 
 (define (on-escape-key tfield)
   (define current-tags (send tfield get-value))
-
+  
   (cond [(string=? current-tags (incoming-tags))
          (send (ivy-canvas) focus)]
         [else (send tfield set-value (incoming-tags))
-         (send tfield set-field-background (make-object color% "white"))
-         (define-values (base name-sym must-be-dir?) (split-path (image-path)))
-         (send ivy-frame set-label (path->string name-sym))]))
+              (send tfield set-field-background (make-object color% "white"))
+              (define-values (base name-sym must-be-dir?) (split-path (image-path)))
+              (send ivy-frame set-label (path->string name-sym))]))
 
 (define ivy-tfield%
   (class text-field%
@@ -230,8 +229,8 @@
       [stretchable-height #f]
       [callback
        (λ (tf evt)
-         (define img-sym (path->symbol (image-path)))
-         (unless (eq? img-sym '/)
+         (define img-str (path->string (image-path)))
+         (unless (string=? img-str "/")
            (define-values (base name-path must-be-dir?) (split-path (image-path)))
            (define name-str (path->string name-path))
            (cond [(eq? (send evt get-event-type) 'text-field-enter)
@@ -240,16 +239,16 @@
                   (cond [(string=? tags "")
                          ; empty tag string means delete the entry
                          ; no failure if key doesn't exist
-                         (dict-remove! master img-sym)
-                         (save-dict! master)]
+                         (send-cmd "del" img-str)]
                         [else
                          ; turn the string of tag(s) into a list then sort it
                          (define tag-lst (remove-duplicates (sort (for/list ([tag (string-split tags ",")])
-                                                                            (string-trim tag))
+                                                                    (string-trim tag))
                                                                   string<?)))
-                         ; set and save the dictionary
-                         (dict-set! master img-sym tag-lst)
-                         (save-dict! master)])
+                         ; remove any existing tags we might have
+                         (send-cmd "del" img-str)
+                         ; push the tags onto the db
+                         (apply send-cmd "rpush" img-str tag-lst)])
                   (send tf set-field-background (make-object color% "spring green"))
                   (send (ivy-canvas) focus)]
                  [else
@@ -263,8 +262,8 @@
        [label "Set"]
        [callback
         (λ (button event)
-          (define img-sym (path->symbol (image-path)))
-          (unless (eq? img-sym '/)
+          (define img-str (path->string (image-path)))
+          (unless (string=? img-str "/")
             (define-values (base name-path must-be-dir?) (split-path (image-path)))
             (send ivy-frame set-label (path->string name-path))
             (define tags (send (ivy-tag-tfield) get-value))
@@ -273,14 +272,14 @@
             ; empty tag string means delete the entry
             (cond [(string=? tags "")
                    ; no failure if key doesn't exist
-                   (dict-remove! master img-sym)
-                   (save-dict! master)]
+                   (send-cmd "del" img-str)]
                   [else
                    ; turn the string of tag(s) into a list then sort it
                    (define tag-lst (sort (string-split tags ", ") string<?))
-                   ; set and save the dictionary
-                   (dict-set! master img-sym tag-lst)
-                   (save-dict! master)])
+                   ; remove any existing tags we might have
+                   (send-cmd "del" img-str)
+                   ; push the tags onto the db
+                   (apply send-cmd "rpush" img-str tag-lst)])
             (send (ivy-canvas) focus)))]))
 
 (define (focus-tag-tfield)

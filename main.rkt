@@ -4,7 +4,6 @@
 ; main file for ivy, the taggable image viewer
 (require racket/class
          racket/cmdline
-         racket/dict
          racket/list
          racket/string
          "base.rkt"
@@ -68,7 +67,7 @@
        ; only searching for tags
        [(and (not (empty? (tags-to-search)))
              (empty? (tags-to-exclude)))
-        (define search-results (sort (map path->string (search-dict master (search-type) (tags-to-search))) string<?))
+        (define search-results (sort (map path->string (search-redis (search-type) (tags-to-search))) string<?))
         (define len (length search-results))
         (unless (zero? len)
           (for ([sr (in-list search-results)])
@@ -77,8 +76,8 @@
        ; only excluding tags
        [(and (empty? (tags-to-search))
              (not (empty? (tags-to-exclude))))
-        (define imgs (dict-keys master))
-        (define final (sort (map path->string (exclude-search master imgs (tags-to-exclude))) string<?))
+        (define imgs (redis-keys))
+        (define final (sort (map path->string (exclude-search imgs (tags-to-exclude))) string<?))
         (define len (length final))
         (unless (zero? len)
           (for ([sr (in-list final)])
@@ -87,11 +86,11 @@
        ; searching for tags and excluding tags
        [(and (not (empty? (tags-to-search)))
              (not (empty? (tags-to-exclude))))
-        (define search-results (search-dict master (search-type) (tags-to-search)))
+        (define search-results (search-redis (search-type) (tags-to-search)))
         (cond [(zero? (length search-results))
                (printf "Found 0 results for tags ~v~n" (tags-to-search))]
               [else
-               (define exclude (sort (map path->string (exclude-search master search-results (tags-to-exclude))) string<?))
+               (define exclude (sort (map path->string (exclude-search search-results (tags-to-exclude))) string<?))
                (for ([ex (in-list exclude)])
                  (printf "~v~n" ex))
                (printf "Found ~a results for tags ~v, excluding tags ~v~n"
