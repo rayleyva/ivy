@@ -62,7 +62,7 @@
             [else
              (define ext-str (string-downcase (bytes->string/utf-8 ext)))
              (if (false? (member ext-str supported-extensions)) #f file)])))
-  (filter path? file-lst))
+  (map normal-case-path (filter path? file-lst)))
 ; parameter listof path
 ; if pfs is empty, attempting to append a single image would
 ; make pfs just that image, rather than a list of length 1
@@ -84,10 +84,17 @@
   (let loop ([accum empty]
              [scanned (send-cmd #:rconn rconn "scan" 0)])
     (define cursor (bytes->number (first scanned)))
-    (if (= 0 cursor)
-        accum
-        (loop (append accum (map bytes->string/utf-8 (second scanned)))
-              (send-cmd #:rconn rconn "scan" cursor)))))
+    (cond
+      ; empty database
+      [(empty? (second scanned)) accum]
+      ; small enough to not need to loop
+      [(and (empty? accum) (= 0 cursor))
+       (append accum (map bytes->string/utf-8 (second scanned)))]
+      ; we've looped all the way back again
+      [(= 0 cursor) accum]
+      [else
+       (loop (append accum (map bytes->string/utf-8 (second scanned)))
+             (send-cmd #:rconn rconn "scan" cursor))])))
 
 ; removes entries for files that no longer exist
 (define (clean-redis! #:rconn [rconn (current-redis-connection)] keys)
@@ -392,7 +399,13 @@
     (define bmp (read-bitmap path))
     ; cannot have slashes in the actual name
     ; fraction slash: U+2044
-    (define str (string-append (string-replace path "/" "⁄") ".png"))
+    (define str
+      (if (eq? (system-type) 'windows)
+          (string-append
+           (string-replace (string-replace path "\\" "_")
+                           "c:" "c")
+           ".png")
+          (string-append (string-replace path "/" "_") ".png")))
     (define bmp-path (build-path thumbnails-path str))
     ; use pict to scale the image to 100x100
     (define pct (bitmap bmp))

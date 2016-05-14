@@ -46,9 +46,11 @@
                   (string-join supported-extensions ";*.")))
                ("Any" "*.*"))))
           ; make sure the path is not false
-          (when paths
-            (define img-path (first paths))
-            (cond [(> (length paths) 1) (pfs paths)]
+          (define nc-paths
+            (if paths (map normal-case-path paths) #f))
+          (when nc-paths
+            (define img-path (first nc-paths))
+            (cond [(> (length nc-paths) 1) (pfs nc-paths)]
                   [else
                    (define-values (base name dir?) (split-path img-path))
                    (image-dir base)
@@ -79,24 +81,26 @@
                   (string-join supported-extensions ";*.")))
                ("Any" "*.*"))))
           ; the user did not click cancel
-          (when paths
+          (define nc-paths
+            (if paths (map normal-case-path paths) #f))
+          (when nc-paths
             (define path-default? (equal? (first (pfs)) (build-path "/")))
             (cond
               ; empty collection and adding more than 1 image
-              [(and path-default? (> (length paths) 1))
-               (pfs paths)]
+              [(and path-default? (> (length nc-paths) 1))
+               (pfs nc-paths)]
               ; empty collection, adding 1 image
               ; like file-open, but only open the single image
               [path-default?
-               (define img-path (first paths))
+               (define img-path (first nc-paths))
                (define-values (base name dir?) (split-path img-path))
                (image-dir base)
-               (pfs paths)
+               (pfs nc-paths)
                (image-path img-path)
                (load-image img-path)]
               ; collection has images; appending to collection
               [else
-               (pfs (append (pfs) paths))
+               (pfs (append (pfs) nc-paths))
                ; change label because it usually isn't called until
                ; (load-image) is called and we want to see the changes now
                (send (status-bar-position) set-label
@@ -114,7 +118,7 @@
         (λ (i e)
           (image-dir (find-system-path 'home-dir))
           (pfs empty)
-          (image-path (build-path "/"))
+          (image-path (normal-case-path (build-path "/")))
           (send (ivy-canvas) set-on-paint!
                 (λ ()
                   (send (ivy-canvas) set-canvas-background

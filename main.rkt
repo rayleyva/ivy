@@ -39,7 +39,7 @@
  #:args requested-images
  (unless (empty? requested-images)
    (define requested-paths
-     (map (λ (img) (simplify-path (expand-user-path img)))
+     (map (λ (img) (normal-case-path (simplify-path (expand-user-path img))))
           requested-images))
    (define checked-paths
      (for/list ([rp requested-paths])
@@ -47,7 +47,7 @@
        ; as the image
        (define-values (base name dir?) (split-path rp))
        (if (eq? base 'relative)
-           (build-path (current-directory-for-user) name)
+           (normal-case-path (build-path (current-directory-for-user) name))
            rp)))
    (cond [(> (length requested-paths) 1)
           ; we want to load a collection
@@ -55,7 +55,7 @@
          [else
           ; we want to load the image from the directory
           (define-values (base name dir?) (split-path (first checked-paths)))
-          (image-dir base)
+          (image-dir (normal-case-path base))
           (pfs (path-files))])
    (image-path (first checked-paths))
    (load-image (image-path) 'cmd))

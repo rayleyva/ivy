@@ -92,12 +92,19 @@
          (send prep-notification show #t)
          
          (define imgs-str (sort (map path->string imgs) string<?))
-         (set! searched-images (map string->path imgs-str))
+         (set! searched-images
+               (map (λ (is) (normal-case-path (string->path is))) imgs-str))
          (define imgs-grid (grid-list imgs-str 6))
          
          ; generate the thumbnail in case it does not exist
          (for ([img-path imgs-str])
-           (define str (string-append (string-replace img-path "/" "⁄") ".png"))
+           (define str
+             (if (eq? (system-type) 'windows)
+                 (string-append
+                  (string-replace (string-replace img-path "\\" "_")
+                                  "c:" "c")
+                  ".png")
+                 (string-append (string-replace img-path "/" "_") ".png")))
            (define thumbnail-path (build-path thumbnails-path str))
            (unless (file-exists? thumbnail-path)
              (generate-thumbnails (list img-path))))
@@ -113,8 +120,13 @@
                        [y (in-naturals)])
                    (for ([path img-list]
                          [x (in-naturals)])
-                     (define str (string-append
-                                  (string-replace path "/" "⁄") ".png"))
+                     (define str
+                       (if (eq? (system-type) 'windows)
+                           (string-append
+                            (string-replace (string-replace path "\\" "_")
+                                            "c:" "c")
+                            ".png")
+                           (string-append (string-replace path "/" "_") ".png")))
                      (define pct-path (build-path thumbnails-path str))
                      (define pct (bitmap pct-path))
                      (draw-pict pct dc (* 100 x) (* 100 y))))))
