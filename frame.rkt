@@ -3,8 +3,8 @@
 ; main frame file for ivy, the taggable image viewer
 (require images/flomap
          pict
+         racket/bool
          racket/class
-         racket/dict
          racket/gui/base
          racket/list
          racket/math
@@ -222,7 +222,12 @@
            [label "&Quit"]
            [shortcut #\Q]
            [help-string "Quit the program."]
-           [callback (λ (i e) (disconnect sqlc) (exit))])))
+           [callback (λ (i e)
+                       ; kill the gif thread, if applicable
+                       (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
+                         (kill-thread (gif-thread)))
+                       (disconnect sqlc)
+                       (exit))])))
 
 ;; Navigation menu items ;;
 
@@ -350,30 +355,36 @@
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -12 (circle 15) (text "+ ")))]
        [callback (λ (button event)
-                   (when image-pict
-                     (load-image image-pict 'larger)))]))
+                   (if (and image-pict (empty? gif-lst))
+                       (load-image image-pict 'larger)
+                       (load-image gif-lst 'larger)))]))
 
 (define ivy-actions-zoom-out
   (new button%
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -10 (circle 15) (text "-  ")))]
        [callback (λ (button event)
-                   (when image-pict
-                     (load-image image-pict 'smaller)))]))
+                   (if (and image-pict (empty? gif-lst))
+                       (load-image image-pict 'smaller)
+                       (load-image gif-lst 'smaller)))]))
 
 (define ivy-actions-zoom-normal
   (new button%
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (rectangle 15 15))]
        [callback (λ (button event)
-                   (load-image image-bmp-master 'none))]))
+                   (if (empty? gif-lst)
+                       (load-image image-bmp-master 'none)
+                       (load-image (image-path) 'none)))]))
 
 (define ivy-actions-zoom-fit
   (new button%
        [parent ivy-toolbar-hpanel]
        [label (pict->bitmap (hc-append -3 (frame (circle 15)) (text " ")))]
        [callback (λ (button event)
-                   (load-image image-bmp-master))]))
+                   (if (empty? gif-lst)
+                       (load-image image-bmp-master)
+                       (load-image (image-path))))]))
 
 (define (on-escape-key tfield)
   (define current-tags (send tfield get-value))
@@ -497,11 +508,17 @@
       (define type (send key get-key-code))
       (case type
         [(wheel-down)
-         (when image-pict
-           (load-image image-pict 'smaller))]
+         (cond [(and image-pict (empty? gif-lst))
+                (load-image image-pict 'smaller)]
+               [(and (false? image-pict)
+                     (not (empty? gif-lst)))
+                (load-image gif-lst 'smaller)])]
         [(wheel-up)
-         (when image-pict
-           (load-image image-pict 'larger))]
+         (cond [(and image-pict (empty? gif-lst))
+                (load-image image-pict 'larger)]
+               [(and (false? image-pict)
+                     (not (empty? gif-lst)))
+                (load-image gif-lst 'larger)])]
         [(f11) (cond [(not (macosx?))
                       (toggle-fullscreen this ivy-frame)])]
         [(left) (load-previous-image)]

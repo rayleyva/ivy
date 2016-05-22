@@ -2,6 +2,7 @@
 ; base.rkt
 ; base file for ivy, the taggable image viewer
 (require file/convertible
+         gif-image
          json
          pict
          racket/bool
@@ -36,6 +37,13 @@
 (define image-dir (make-parameter (find-system-path 'home-dir)))
 (define supported-extensions '("png" "jpg" "jpe" "jpeg" "bmp" "gif"))
 (define exact-search? (make-parameter #f))
+
+; animated gif stuff
+; list of pict?
+(define gif-lst empty)
+; list of real?
+(define gif-lst-timings empty)
+(define gif-thread (make-parameter #f))
 
 ; all image files contained within image-dir
 (define (path-files)
@@ -127,10 +135,59 @@
 (define status-bar-position (make-parameter #f))
 (define incoming-tags (make-parameter ""))
 
+(define (animated-gif-callback canvas dc lst)
+  (define gif-x (inexact->exact (round (pict-width (first lst)))))
+  (define gif-y (inexact->exact (round (pict-height (first lst)))))
+  (define gif-center-x (/ gif-x 2))
+  (define gif-center-y (/ gif-y 2))
+  
+  (define canvas-x (send canvas get-width))
+  (define canvas-y (send canvas get-height))
+  (define canvas-center-x (/ canvas-x 2))
+  (define canvas-center-y (/ canvas-y 2))
+  
+  (define len (length lst))
+  
+  (let loop ([gif-frame (first lst)]
+             [timing (first gif-lst-timings)]
+             [i 0])
+    
+    ; remove any previous frames from the canvas
+    (send dc clear)
+    
+    (cond
+      ; if the image is really big, place it at (0,0)
+      [(and (> gif-x canvas-x)
+            (> gif-y canvas-y))
+       (send canvas show-scrollbars #t #t)
+       (draw-pict gif-frame dc 0 0)]
+      ; if the image is wider than the canvas,
+      ; place it at (0,y)
+      [(> gif-y canvas-x)
+       (send canvas show-scrollbars #t #f)
+       (draw-pict gif-frame dc
+                  0 (- canvas-center-y gif-center-y))]
+      ; if the image is taller than the canvas,
+      ; place it at (x,0)
+      [(> gif-y canvas-y)
+       (send canvas show-scrollbars #f #t)
+       (draw-pict gif-frame dc
+                  (- canvas-center-x gif-center-x) 0)]
+      ; otherwise, place it at the normal position
+      [else
+       (send canvas show-scrollbars #f #f)
+       (draw-pict gif-frame dc
+                  (- canvas-center-x gif-center-x)
+                  (- canvas-center-y gif-center-y))])
+    (sleep timing)
+    (if (>= i len)
+        (loop (first lst) (first gif-lst-timings) 0)
+        (loop (list-ref lst i) (list-ref gif-lst-timings i) (add1 i)))))
+
 ; procedure that loads the given image to the canvas
 ; takes care of updating the dimensions message and
 ; the position message
-; scale: (or/c 'default 'cmd 'larger 'smaller 'none
+; scale: (or/c 'default 'cmd 'larger 'smaller 'none)
 (define (load-image img [scale 'default])
   (define canvas (ivy-canvas))
   (define tag-tfield (ivy-tag-tfield))
@@ -143,87 +200,134 @@
      (image-dir base)
      (image-path img)
      (define img-str (path->string img))
-     ; make sure the bitmap loaded correctly
-     (define load-success (send image-bmp-master load-file img))
-     (cond [load-success
-            (send (send canvas get-parent) set-label (path->string name))
-            (send sbd set-label
-                  (format "~a x ~a pixels"
-                          (send image-bmp-master get-width)
-                          (send image-bmp-master get-height)))
-            (set! image-pict (scale-image image-bmp-master scale))
-            (send sbp set-label
-                  (format "~a / ~a"
-                          (+ (get-index img (pfs)) 1)
-                          (length (pfs))))
-            
-            ; pick what string to display for tags...
-            (cond [(db-has-key? "images" img-str)
-                   (define img-obj (make-data-object sqlc image% img-str))
-                   (define tags (send img-obj get-tags))
-                   (incoming-tags (string-join tags ", "))]
-                  [else (incoming-tags "")])
-            ; ...put them in the tfield
-            (send tag-tfield set-value (incoming-tags))
-            ; ensure the text-field displays the changes we just made
-            (send tag-tfield refresh)]
-           [else (eprintf "Error loading file ~a~n" img)])]
+     (cond
+       ; load an animated gif
+       [(and (gif? img) (gif-animated? img))
+        ; make a list of picts
+        (set! gif-lst
+              (for/list ([bits (gif-images img)])
+                (define bmp-in-port (open-input-bytes bits))
+                (define bmp (make-object bitmap% 50 50))
+                (send bmp load-file bmp-in-port 'gif/alpha)
+                (close-input-port bmp-in-port)
+                (scale-image bmp scale)))
+        (set! gif-lst-timings (gif-timings img))
+        (set! image-pict #f)
+        (send image-bmp-master load-file img)
+        (send sbd set-label
+              (format "~a x ~a pixels"
+                      (send image-bmp-master get-width)
+                      (send image-bmp-master get-height)))]
+       ; else load the static image
+       [else
+        ; make sure the bitmap loaded correctly
+        (define load-success (send image-bmp-master load-file img))
+        (cond [load-success
+               (set! image-pict (scale-image image-bmp-master scale))
+               (send sbd set-label
+                     (format "~a x ~a pixels"
+                             (send image-bmp-master get-width)
+                             (send image-bmp-master get-height)))
+               (set! gif-lst empty)
+               (set! gif-lst-timings empty)]
+              [else
+               (eprintf "Error loading file ~a~n" img)])])
+     
+     (send (send canvas get-parent) set-label (path->string name))
+     (send sbp set-label
+           (format "~a / ~a"
+                   (+ (get-index img (pfs)) 1)
+                   (length (pfs))))
+     
+     ; pick what string to display for tags...
+     (cond [(db-has-key? "images" img-str)
+            (define img-obj (make-data-object sqlc image% img-str))
+            (define tags (send img-obj get-tags))
+            (incoming-tags (string-join tags ", "))]
+           [else (incoming-tags "")])
+     ; ...put them in the tfield
+     (send tag-tfield set-value (incoming-tags))
+     ; ensure the text-field displays the changes we just made
+     (send tag-tfield refresh)]
+    [(list? img)
+     ; scale the image in the desired direction
+     (set! gif-lst (map (λ (pict) (scale-image pict scale)) img))
+     (set! image-pict #f)]
     [else
      ; we already have the image loaded
+     (set! gif-lst empty)
+     (set! gif-lst-timings empty)
      (set! image-pict (scale-image img scale))])
   
-  (send canvas set-on-paint!
-        (λ (canvas dc)
-          (when (and (path? img) (eq? scale 'default))
-            ; have the canvas re-scale the image so when the canvas is
-            ; resized, it'll also be the proper size
-            (set! image-pict (scale-image image-bmp-master 'default)))
-          
-          (define img-width (inexact->exact (round (pict-width image-pict))))
-          (define img-height (inexact->exact (round (pict-height image-pict))))
-          
-          (define img-center-x (/ img-width 2))
-          (define img-center-y (/ img-height 2))
-          (define canvas-x (send canvas get-width))
-          (define canvas-y (send canvas get-height))
-          (define canvas-center-x (/ canvas-x 2))
-          (define canvas-center-y (/ canvas-y 2))
-          
-          ; keep the background black
-          (send canvas set-canvas-background
-                (make-object color% "black"))
-          
-          (cond
-            ; if the image is really big, place it at (0,0)
-            [(and (> img-width canvas-x)
-                  (> img-height canvas-y))
-             (send canvas show-scrollbars #t #t)
-             (draw-pict image-pict dc 0 0)]
-            ; if the image is wider than the canvas,
-            ; place it at (0,y)
-            [(> img-width canvas-x)
-             (send canvas show-scrollbars #t #f)
-             (draw-pict image-pict dc
-                        0 (- canvas-center-y img-center-y))]
-            ; if the image is taller than the canvas,
-            ; place it at (x,0)
-            [(> img-height canvas-y)
-             (send canvas show-scrollbars #f #t)
-             (draw-pict image-pict dc
-                        (- canvas-center-x img-center-x) 0)]
-            ; otherwise, place it at the normal position
-            [else
-             (send canvas show-scrollbars #f #f)
-             (draw-pict image-pict dc
-                        (- canvas-center-x img-center-x)
-                        (- canvas-center-y img-center-y))])))
-
+  (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
+    (kill-thread (gif-thread)))
+  
+  (if (not (empty? gif-lst))
+      ; gif-lst contains a list of picts, display the animated gif
+      (send canvas set-on-paint!
+            (λ (canvas dc)
+              (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
+                (kill-thread (gif-thread)))
+              
+              (send dc set-background "black")
+              
+              (gif-thread
+               (thread
+                (λ ()
+                  (animated-gif-callback canvas dc gif-lst))))))
+      ; otherwise, display the static image
+      (send canvas set-on-paint!
+            (λ (canvas dc)
+              (when (and (path? img) (eq? scale 'default))
+                ; have the canvas re-scale the image so when the canvas is
+                ; resized, it'll also be the proper size
+                (set! image-pict (scale-image image-bmp-master 'default)))
+              
+              (define img-width (inexact->exact (round (pict-width image-pict))))
+              (define img-height (inexact->exact (round (pict-height image-pict))))
+              
+              (define img-center-x (/ img-width 2))
+              (define img-center-y (/ img-height 2))
+              (define canvas-x (send canvas get-width))
+              (define canvas-y (send canvas get-height))
+              (define canvas-center-x (/ canvas-x 2))
+              (define canvas-center-y (/ canvas-y 2))
+              
+              ; keep the background black
+              (send canvas set-canvas-background
+                    (make-object color% "black"))
+              
+              (cond
+                ; if the image is really big, place it at (0,0)
+                [(and (> img-width canvas-x)
+                      (> img-height canvas-y))
+                 (send canvas show-scrollbars #t #t)
+                 (draw-pict image-pict dc 0 0)]
+                ; if the image is wider than the canvas,
+                ; place it at (0,y)
+                [(> img-width canvas-x)
+                 (send canvas show-scrollbars #t #f)
+                 (draw-pict image-pict dc
+                            0 (- canvas-center-y img-center-y))]
+                ; if the image is taller than the canvas,
+                ; place it at (x,0)
+                [(> img-height canvas-y)
+                 (send canvas show-scrollbars #f #t)
+                 (draw-pict image-pict dc
+                            (- canvas-center-x img-center-x) 0)]
+                ; otherwise, place it at the normal position
+                [else
+                 (send canvas show-scrollbars #f #f)
+                 (draw-pict image-pict dc
+                            (- canvas-center-x img-center-x)
+                            (- canvas-center-y img-center-y))]))))
+  
   ; tell the scrollbars to adjust for the size of the image
-  (let* ([pict-width (inexact->exact (round (pict-width image-pict)))]
-         [pict-height (inexact->exact (round (pict-height image-pict)))])
+  (let* ([pct-x (inexact->exact (round (pict-width (if image-pict image-pict (first gif-lst)))))]
+         [pct-y (inexact->exact (round (pict-height (if image-pict image-pict (first gif-lst)))))])
     ; will complain if width/height is less than 1
-    (define width (if (< pict-width 1) 1 pict-width))
-    (define height (if (< pict-height 1) 1 pict-height))
+    (define width (if (< pct-x 1) 1 pct-x))
+    (define height (if (< pct-y 1) 1 pct-y))
     
     (case scale
       [(smaller larger)
@@ -238,6 +342,9 @@
 ; mmm... curry
 (define ((load-image-in-collection direction))
   (unless (or (false? image-pict) (eq? (path->symbol (image-path)) '/))
+    ; kill the gif thread, if applicable
+    (unless (or (false? (gif-thread)) (thread-dead? (gif-thread)))
+      (kill-thread (gif-thread)))
     (send (ivy-tag-tfield) set-field-background (make-object color% "white"))
     (define prev-index (get-index (image-path) (pfs)))
     (case direction
