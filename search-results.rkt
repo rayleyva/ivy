@@ -1,12 +1,24 @@
 #lang racket/base
 ; search-results.rkt
-(require pict
+(require racket/lazy-require
+         ;pict
          racket/class
          racket/gui/base
-         racket/list
-         racket/path
+         ;racket/list
+         ;racket/path
          "base.rkt"
          "files.rkt")
+(lazy-require [pict (bitmap)]
+              [pict (pict->bitmap)]
+              [pict (text)]
+              [pict (vc-append)]
+
+              [racket/list (empty)]
+              [racket/list (empty?)]
+              [racket/list (first)]
+              [racket/list (remove-duplicates)]
+
+              [racket/path (file-name-from-path)])
 (provide results-frame display-tags display-nil-results-alert)
 
 (define searched-images empty)

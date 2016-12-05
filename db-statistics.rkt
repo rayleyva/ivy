@@ -1,10 +1,17 @@
 #lang racket/base
 ; db-statistics.rkt
-(require racket/class
-         racket/format
+(require racket/lazy-require
+         racket/class
+         ;racket/format
          racket/gui/base
-         racket/list
+         ;racket/list
          "db.rkt")
+(lazy-require [racket/format (~r)]
+
+              [racket/list (first)]
+              [racket/list (empty?)]
+              [racket/list (rest)]
+              [racket/list (second)])
 (provide stats-frame update-stats)
 
 (define stats-frame (new frame%

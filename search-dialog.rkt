@@ -1,11 +1,13 @@
 #lang racket/base
 ; search-dialog.rkt
-(require racket/class
+(require racket/lazy-require
+         racket/class
          racket/gui/base
-         racket/list
+         ;racket/list
          "base.rkt"
          "db.rkt"
          "search-results.rkt")
+(lazy-require [racket/list (empty?)])
 (provide search-tag-dialog
          search-tfield)
 

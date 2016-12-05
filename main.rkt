@@ -2,14 +2,28 @@
 #lang racket/base
 ; main.rkt
 ; main file for ivy, the taggable image viewer
-(require racket/class
+(require racket/lazy-require
+         racket/class
          racket/cmdline
-         racket/list
-         racket/path
-         racket/string
+         ;racket/list
+         ;racket/path
+         ;racket/string
          "base.rkt"
          "db.rkt"
          "frame.rkt")
+(lazy-require [racket/list (empty)]
+              [racket/list (empty?)]
+              [racket/list (remove-duplicates)]
+              [racket/list (first)]
+              [racket/list (rest)]
+              [racket/list (last)]
+              [racket/list (take)]
+
+              [racket/path (simple-form-path)]
+              [racket/path (file-name-from-path)]
+
+              [racket/string (string-split)]
+              [racket/string (string-trim)])
 
 (define ivy-version 1.3)
 

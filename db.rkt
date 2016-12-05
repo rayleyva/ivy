@@ -1,17 +1,41 @@
 #lang racket/base
 ; db.rkt
 ; contains class definitions for interacting with racquel and sqlite
-(require db/base
-         db/sqlite3
-         racket/bool
+(require racket/lazy-require
+         ;db/base
+         ;db/sqlite3
+         ;racket/bool
          racket/class
          racket/contract
-         racket/list
-         racket/string
+         ;racket/list
+         ;racket/string
          racquel
-         (only-in srfi/13
+         #;(only-in srfi/13
                   string-contains-ci)
          "files.rkt")
+(lazy-require [db/base (connection?)]
+              [db/base (disconnect)]
+              [db/base (query)]
+              [db/base (query-exec)]
+              [db/base (rows-result-rows)]
+
+              [db/sqlite3 (sqlite3-connect)]
+
+              [racket/bool (false?)]
+
+              [racket/list (empty)]
+              [racket/list (empty?)]
+              [racket/list (first)]
+              [racket/list (flatten)]
+              [racket/list (rest)]
+              [racket/list (remove-duplicates)]
+              [racket/list (second)]
+
+              [racket/string (string-join)]
+              [racket/string (string-replace)]
+              [racket/string (string-split)]
+
+              [srfi/13 (string-contains-ci)])
 (provide (all-defined-out)
          disconnect
          make-data-object

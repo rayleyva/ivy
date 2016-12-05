@@ -1,11 +1,13 @@
 #lang racket/base
 ; tag-browser.rkt
 ; browse taglist and images, modify tags if necessary
-(require racket/class
+(require racket/lazy-require
+         racket/class
          racket/gui/base
-         racket/string
+         ;racket/string
          "base.rkt"
          "db.rkt")
+(lazy-require [racket/string (string-replace)])
 (provide show-tag-browser)
 
 (define browser-frame

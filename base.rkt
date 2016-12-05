@@ -1,23 +1,69 @@
 #lang racket/base
 ; base.rkt
 ; base file for ivy, the taggable image viewer
-(require file/convertible
-         gif-image
-         pict
-         racket/bool
+(require racket/lazy-require
+         ;file/convertible
+         ;gif-image
+         ;pict
+         ;racket/bool
          racket/class
          racket/contract
-         racket/function
+         ;racket/function
          racket/gui/base
-         racket/list
-         racket/path
-         racket/string
-         rsvg
-         (only-in srfi/13
+         ;racket/list
+         ;racket/path
+         ;racket/string
+         ;rsvg
+         #;(only-in srfi/13
                   string-contains-ci
                   string-null?)
          "db.rkt"
          "files.rkt")
+(lazy-require [file/convertible (convert)]
+
+              [gif-image (gif?)]
+              [gif-image (gif-animated?)]
+              [gif-image (gif-cumulative?)]
+              [gif-image (gif-images)]
+              [gif-image (gif-timings)]
+
+              [pict (bitmap)]
+              [pict (draw-pict)]
+              [pict (filled-rectangle)]
+              [pict (hc-append)]
+              [pict (pict?)]
+              [pict (pict-height)]
+              [pict (pict-width)]
+              [pict (pict->bitmap)]
+              [pict (scale-to-fit)]
+              [pict (vl-append)]
+
+              [racket/bool (false?)]
+
+              [racket/function (negate)]
+
+              [racket/list (drop)]
+              [racket/list (empty)]
+              [racket/list (empty?)]
+              [racket/list (first)]
+              [racket/list (flatten)]
+              [racket/list (last)]
+              [racket/list (make-list)]
+              [racket/list (remove-duplicates)]
+              [racket/list (take)]
+
+              [racket/path (path-get-extension)]
+
+              [racket/string (string-append)]
+              [racket/string (string-join)]
+              [racket/string (string-replace)]
+              [racket/string (string-split)]
+              [racket/string (string-trim)]
+
+              [rsvg (load-svg-from-file)]
+
+              [srfi/13 (string-contains-ci)]
+              [srfi/13 (string-null?)])
 (provide (all-defined-out)
          string-null?
          gif?
@@ -36,6 +82,7 @@
   (if (eq? (system-type) 'windows)
       (build-path "C:\\")
       (build-path "/")))
+
 ; path of the currently displayed image
 (define image-path (make-parameter root-path))
 ; master bitmap of loaded image-path

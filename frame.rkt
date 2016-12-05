@@ -1,20 +1,44 @@
 #lang racket/base
 ; frame.rkt
 ; main frame file for ivy, the taggable image viewer
-(require images/flomap
-         pict
-         racket/bool
+(require racket/lazy-require
+         ;images/flomap
+         ;pict
+         ;racket/bool
          racket/class
          racket/gui/base
-         racket/list
+         ;racket/list
          racket/math
-         racket/string
+         ;racket/string
          "base.rkt"
          "db.rkt"
          "db-statistics.rkt"
          "files.rkt"
          "search-dialog.rkt"
          "tag-browser.rkt")
+(lazy-require [images/flomap (bitmap->flomap)]
+              [images/flomap (flomap-flip-horizontal)]
+              [images/flomap (flomap-flip-vertical)]
+              [images/flomap (flomap->bitmap)]
+
+              [pict (arrow)]
+              [pict (bitmap)]
+              [pict (circle)]
+              [pict (frame)]
+              [pict (hc-append)]
+              [pict (pict?)]
+              [pict (pict->bitmap)]
+              [pict (rectangle)]
+              [pict (rotate)]
+              [pict (text)]
+
+              [racket/bool (false?)]
+
+              [racket/list (empty?)]
+              [racket/list (first)]
+              [racket/list (remove-duplicates)]
+
+              [racket/string (string-join)])
 (provide (all-defined-out))
 
 (define ivy-frame
